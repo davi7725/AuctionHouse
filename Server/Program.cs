@@ -14,15 +14,12 @@ namespace Server
     {
         private List<StreamWriter> streams = new List<StreamWriter>();
         private Item item = new Item("Item", 123);
-        private static System.Timers.Timer gavel = new System.Timers.Timer();
-        private string highestBidder;
+        private Gavel gavel;
+        private Mutex mutex = new Mutex();
 
         private void Run()
         {
-            gavel.Elapsed += (source, e) =>
-            {
-                Broadcast("Bam");
-            };
+            gavel = new Gavel(streams);
             TcpListener serverSocket = new TcpListener(IPAddress.Any, 1234);
             serverSocket.Start();
             while (true) { 
@@ -39,26 +36,31 @@ namespace Server
             StreamReader streamReader = new StreamReader(networkStream);
             streams.Add(streamWriter);
 
-            streamWriter.WriteLine("Item on sale: " + item.Name + "\tItem price: " + item.Price);
+            streamWriter.WriteLine("Item on sale: " + item.Name + "\tItem price: " + item.GetPrice());
             while (true)
             {
                 string message = streamReader.ReadLine();
                 try
                 {
+
                     int biddingValue = int.Parse(message);
-                    if (item.UpdatePrice(biddingValue))
+
+                    mutex.WaitOne();
+                    if (item.GetPrice() < biddingValue)
                     {
-                        streamWriter.WriteLine("Bid ok");
-                        Broadcast("Highest bid now " + biddingValue);
-                        SuccessfulBid(clientSocket.LocalEndPoint.ToString());
+                        if (gavel.Stop())
+                        {
+                            item.UpdatePrice(biddingValue);
+                            streamWriter.WriteLine("Bid ok");
+                            Broadcast("Highest bid now " + biddingValue);
+                            gavel.Start(clientSocket.LocalEndPoint.ToString(), biddingValue);
+                        }
                     }
-                    else
-                    {
-                        streamWriter.WriteLine("Bid failed");
-                    }
+                    mutex.ReleaseMutex();
                 }
                 catch (Exception e)
                 {
+                    Console.WriteLine(e.Message);
                     streamWriter.WriteLine("Incorrect bid format");
                 }
             }
@@ -67,13 +69,6 @@ namespace Server
         private void Broadcast(string message)
         {
             streams.ForEach((stream) => stream.WriteLine(message));
-        }
-
-        private void SuccessfulBid(string clientName)
-        {
-            gavel.Interval = 10000;
-            gavel.Enabled = true;
-            highestBidder = clientName;
         }
 
         static void Main(string[] args)

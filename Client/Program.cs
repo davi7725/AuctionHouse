@@ -13,11 +13,12 @@ namespace Client
     {
         static void Main(string[] args)
         {
-            TcpClient server = new TcpClient("localhost", 11000);
+            TcpClient server = new TcpClient("127.0.0.1", 1234);
 
             NetworkStream stream = server.GetStream();
             StreamWriter writer = new StreamWriter(stream);
             StreamReader reader = new StreamReader(stream);
+            writer.AutoFlush = true;
 
             Thread printer = new Thread(printServerMessages);
             printer.Start(reader);
@@ -25,7 +26,6 @@ namespace Client
             while (true)
             {
                 writer.WriteLine(Console.ReadLine());
-                writer.Flush();
             }
         }
 

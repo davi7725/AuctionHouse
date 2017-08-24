@@ -18,22 +18,36 @@ namespace Client
             NetworkStream stream = server.GetStream();
             StreamWriter writer = new StreamWriter(stream);
             StreamReader reader = new StreamReader(stream);
+            writer.AutoFlush = true;
 
-            Thread printer = new Thread(printServerMessages);
+            Thread printer = new Thread(PrintServerMessages);
             printer.Start(reader);
-
-            while (true)
+            try
             {
-                writer.WriteLine(Console.ReadLine());
-                writer.Flush();
+                while (true)
+                {
+                    writer.WriteLine(Console.ReadLine());
+                }
+            }
+            catch
+            {
             }
         }
 
-        static private void printServerMessages(object sr)
+        static private void PrintServerMessages(object sr)
         {
             StreamReader reader = (StreamReader)sr;
-            while (true)
-                Console.WriteLine(reader.ReadLine());
+            try
+            {
+                while (true)
+                {
+                    Console.WriteLine(reader.ReadLine());
+                }
+            }
+            catch
+            {
+                Console.WriteLine("Server error!!!!");
+            }
         }
     }
 }

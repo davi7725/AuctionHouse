@@ -20,6 +20,7 @@ namespace Server
             socket = clientSocket;
             StreamWriter = sw;
             StreamReader = sr;
+            this.Name = name;
         }
 
         public void Dispose()

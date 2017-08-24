@@ -108,5 +108,15 @@ namespace Server
                 });
             }
         }
+
+        public bool IsFinished()
+        {
+            bool res;
+            lock (timerLock)
+            {
+                res = bidFinished;
+            }
+            return res;
+        }
     }
 }

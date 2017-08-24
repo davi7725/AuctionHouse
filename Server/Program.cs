@@ -21,6 +21,12 @@ namespace Server
         {
             TcpListener serverSocket = new TcpListener(IPAddress.Any, 1234);
             serverSocket.Start();
+
+            for (int i = 0; i < 10; i++)
+            {
+                auctions.Add(new ItemAuction(new Item("Item number " + i, i*100)));
+            }
+
             while (true)
             {
                 Socket clientSocket = serverSocket.AcceptSocket();
@@ -36,6 +42,7 @@ namespace Server
             StreamReader sr = new StreamReader(networkStream);
 
             string name = null;
+            sw.WriteLine("Choose a username!");
             do
             {
                 if (name != null)
@@ -44,6 +51,7 @@ namespace Server
                 }
                 name = sr.ReadLine();
             } while (names.Contains(name));
+            names.Add(name);
             sw.WriteLine("Name ok.");
             return new Client(clientSocket, sw, sr, name);
         }
@@ -53,7 +61,9 @@ namespace Server
             c.StreamWriter.WriteLine("Choose an item.");
             foreach (ItemAuction itemAuction in auctions)
             {
-                c.StreamWriter.WriteLine("{0} - Name: {1} - Current price: {2}", itemAuction.ID, itemAuction.Item.Name, itemAuction.Item.GetPrice());
+                if (!itemAuction.IsBidFinished()) { 
+                    c.StreamWriter.WriteLine("{0} - Name: {1} - Current price: {2}", itemAuction.ID, itemAuction.Item.Name, itemAuction.Item.GetPrice());
+                }
             }
 
             ItemAuction ia = null;
@@ -77,7 +87,7 @@ namespace Server
                 catch (FormatException)
                 {
                 }
-            } while (ia == null);
+            } while (ia == null || ia.IsBidFinished());
 
             return ia;
         }
@@ -107,6 +117,7 @@ namespace Server
             }
             catch (IOException)
             {
+                Console.WriteLine(client.Name + " disconnected");
                 if (chosenAuction != null)
                 {
                     chosenAuction.RemoveClient(client);

@@ -29,31 +29,56 @@ namespace Server
             //TODO go back to selection
             AddClient(c);
             c.StreamWriter.WriteLine("Item on sale: " + Item.Name + "\tItem price: " + Item.GetPrice());
-            while (true)
+            bool repeat = true;
+            c.StreamWriter.WriteLine("Type quit to quit");
+            while (repeat)
             {
                 string message = c.StreamReader.ReadLine();
-                try
+                if (message != "quit")
                 {
-
-                    int biddingValue = int.Parse(message);
-
-                    mutex.WaitOne();
-                    if (Item.GetPrice() < biddingValue)
+                    try
                     {
-                        if (gavel.Stop())
+
+                        int biddingValue = int.Parse(message);
+
+                        mutex.WaitOne();
+                        if (Item.GetPrice() < biddingValue)
                         {
-                            Item.UpdatePrice(biddingValue);
-                            c.StreamWriter.WriteLine("Bid ok");
-                            Utils.Broadcast("Highest bid now " + biddingValue, (from client in clients select c.StreamWriter).ToList());
-                            gavel.Start(c.Name, biddingValue);
+                            if (gavel.Stop())
+                            {
+                                Item.UpdatePrice(biddingValue);
+                                c.StreamWriter.WriteLine("Bid ok");
+                                Utils.Broadcast("Highest bid now " + biddingValue, clients);
+                                gavel.Start(c.Name, biddingValue);
+                            }
+                            else
+                            {
+                                c.StreamWriter.WriteLine("The auction is finished!");
+                            }
                         }
+                        else
+                        {
+                            if (gavel.IsFinished())
+                            {
+                                c.StreamWriter.WriteLine("The auction is finished!");
+                            }
+                            else
+                            {
+                                c.StreamWriter.WriteLine("Your bid is too low!");
+                            }
+                        }
+                        mutex.ReleaseMutex();
                     }
-                    mutex.ReleaseMutex();
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e.Message);
+                        c.StreamWriter.WriteLine("Incorrect bid format");
+                    }
                 }
-                catch (Exception e)
+                else
                 {
-                    Console.WriteLine(e.Message);
-                    c.StreamWriter.WriteLine("Incorrect bid format");
+                    repeat = false;
+                    RemoveClient(c);
                 }
             }
         }
@@ -73,6 +98,11 @@ namespace Server
                 clients.Remove(c);
                 gavel.RemoveClientStream(c.StreamWriter);
             }
+        }
+
+        public bool IsBidFinished()
+        {
+            return gavel.IsFinished();
         }
     }
 }

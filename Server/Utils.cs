@@ -11,10 +11,16 @@ namespace Server
     {
         public static void Broadcast(string message, ICollection<StreamWriter> streams)
         {
+            StreamWriter o = null;
             foreach (StreamWriter stream in streams)
             {
+                Console.WriteLine(stream.GetHashCode());
                 stream.WriteLine(message);
             }
+        }
+
+        public static void Broadcast(string message, ICollection<Client> clients) {
+            Utils.Broadcast(message, (from client in clients select client.StreamWriter).ToList());
         }
     }
 }

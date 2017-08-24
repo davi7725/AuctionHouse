@@ -10,7 +10,7 @@ namespace Server
 {
     class Gavel
     {
-        private List<StreamWriter> clientsStreams;
+        private List<StreamWriter> clientsStreams = new List<StreamWriter>();
         private Timer timer1 = new Timer(5000);
         private Timer timer2 = new Timer(8000);
         private Timer timer3 = new Timer(10000);
@@ -19,28 +19,30 @@ namespace Server
         private string bidder;
         private int price;
         private object timerLock = new object();
+        private object clientsLock = new object();
         private bool stopped = true;
 
-        public Gavel(List<StreamWriter> clientsStreams)
+        public Gavel()
         {
-            this.clientsStreams = clientsStreams;
             timer1.AutoReset = false;
             timer2.AutoReset = false;
             timer3.AutoReset = false;
 
             timer1.Elapsed += (sender, e) =>
             {
-                clientsStreams.ForEach(stream => stream.WriteLine("First!"));
+                Broadcast("First!");
             };
             timer2.Elapsed += (sender, e) =>
             {
-                clientsStreams.ForEach(stream => stream.WriteLine("Second!"));
+                Broadcast("Second!");
             };
             timer3.Elapsed += (sender, e) =>
             {
-                lock (timerLock) { 
-                    if (!timer1.Enabled && !stopped) {
-                        clientsStreams.ForEach(stream => stream.WriteLine("Third! Sold to {0} for {1}!", bidder, price));
+                lock (timerLock)
+                {
+                    if (!timer1.Enabled && !stopped)
+                    {
+                        Broadcast("Third! Sold to " + bidder + " for " + price +"!");
                         bidFinished = true;
                     }
                 }
@@ -50,8 +52,10 @@ namespace Server
         public bool Stop()
         {
             bool stopOk = false;
-            lock (timerLock) {
-                if (!bidFinished) {
+            lock (timerLock)
+            {
+                if (!bidFinished)
+                {
                     timer1.Stop();
                     timer2.Stop();
                     timer3.Stop();
@@ -72,6 +76,36 @@ namespace Server
                 timer2.Start();
                 timer3.Start();
                 stopped = false;
+            }
+        }
+        public void AddClientStream(StreamWriter sw)
+        {
+            lock (clientsLock)
+            {
+                clientsStreams.Add(sw);
+            }
+        }
+        public void RemoveClientStream(StreamWriter sw)
+        {
+            lock (clientsLock)
+            {
+                clientsStreams.Remove(sw);
+            }
+        }
+
+        private void Broadcast(string message)
+        {
+            lock (clientsLock)
+            {
+                clientsStreams.ForEach(stream => {
+                    try
+                    {
+                        stream.WriteLine(message);
+                    }
+                    catch (IOException)
+                    {   
+                    }
+                });
             }
         }
     }

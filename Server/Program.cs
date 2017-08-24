@@ -13,62 +13,107 @@ namespace Server
     class Program
     {
         private List<StreamWriter> streams = new List<StreamWriter>();
-        private Item item = new Item("Item", 123);
-        private Gavel gavel;
         private Mutex mutex = new Mutex();
+        private List<ItemAuction> auctions = new List<ItemAuction>();
+        private List<string> names = new List<string>();
 
         private void Run()
         {
-            gavel = new Gavel(streams);
             TcpListener serverSocket = new TcpListener(IPAddress.Any, 1234);
             serverSocket.Start();
-            while (true) { 
-                Socket clientSocket = serverSocket.AcceptSocket();
-                new Thread(new ThreadStart(() => ClientThread(clientSocket))).Start();
-            }
-        }
-
-        private void ClientThread(Socket clientSocket)
-        {
-            NetworkStream networkStream = new NetworkStream(clientSocket);
-            StreamWriter streamWriter = new StreamWriter(networkStream);
-            streamWriter.AutoFlush = true;
-            StreamReader streamReader = new StreamReader(networkStream);
-            streams.Add(streamWriter);
-
-            streamWriter.WriteLine("Item on sale: " + item.Name + "\tItem price: " + item.GetPrice());
             while (true)
             {
-                string message = streamReader.ReadLine();
-                try
-                {
-
-                    int biddingValue = int.Parse(message);
-
-                    mutex.WaitOne();
-                    if (item.GetPrice() < biddingValue)
-                    {
-                        if (gavel.Stop())
-                        {
-                            item.UpdatePrice(biddingValue);
-                            streamWriter.WriteLine("Bid ok");
-                            Broadcast("Highest bid now " + biddingValue);
-                            gavel.Start(clientSocket.LocalEndPoint.ToString(), biddingValue);
-                        }
-                    }
-                    mutex.ReleaseMutex();
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                    streamWriter.WriteLine("Incorrect bid format");
-                }
+                Socket clientSocket = serverSocket.AcceptSocket();
+                new Thread(new ThreadStart(() => ClientThread(InitializeClient(clientSocket)))).Start();
             }
         }
 
-        private void Broadcast(string message)
+        private Client InitializeClient(Socket clientSocket)
         {
-            streams.ForEach((stream) => stream.WriteLine(message));
+            NetworkStream networkStream = new NetworkStream(clientSocket);
+            StreamWriter sw = new StreamWriter(networkStream);
+            sw.AutoFlush = true;
+            StreamReader sr = new StreamReader(networkStream);
+
+            string name = null;
+            do
+            {
+                if (name != null)
+                {
+                    sw.WriteLine("Name already taken!");
+                }
+                name = sr.ReadLine();
+            } while (names.Contains(name));
+            sw.WriteLine("Name ok.");
+            return new Client(clientSocket, sw, sr, name);
+        }
+
+        private ItemAuction AuctionSelection(Client c)
+        {
+            c.StreamWriter.WriteLine("Choose an item.");
+            foreach (ItemAuction itemAuction in auctions)
+            {
+                c.StreamWriter.WriteLine("{0} - Name: {1} - Current price: {2}", itemAuction.ID, itemAuction.Item.Name, itemAuction.Item.GetPrice());
+            }
+
+            ItemAuction ia = null;
+            bool firstTime = true;
+            do
+            {
+                if (!firstTime)
+                {
+                    c.StreamWriter.WriteLine("Invalid input.");
+                }
+                else
+                {
+                    firstTime = false;
+                }
+
+                try
+                {
+                    int id = int.Parse(c.StreamReader.ReadLine());
+                    ia = GetAuctionFromID(id);
+                }
+                catch (FormatException)
+                {
+                }
+            } while (ia == null);
+
+            return ia;
+        }
+
+        private ItemAuction GetAuctionFromID(int id)
+        {
+            foreach (ItemAuction ia in auctions)
+            {
+                if (ia.ID == id)
+                {
+                    return ia;
+                }
+            }
+            return null;
+        }
+
+        private void ClientThread(Client client)
+        {
+            ItemAuction chosenAuction = null;
+            try
+            {
+                while (true)
+                {
+                    chosenAuction = AuctionSelection(client);
+                    chosenAuction.PartecipateAuction(client);
+                }
+            }
+            catch (IOException)
+            {
+                if (chosenAuction != null)
+                {
+                    chosenAuction.RemoveClient(client);
+                }
+                names.Remove(client.Name);
+                client.Dispose();
+            }
         }
 
         static void Main(string[] args)

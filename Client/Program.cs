@@ -13,7 +13,7 @@ namespace Client
     {
         static void Main(string[] args)
         {
-            TcpClient server = new TcpClient("localhost", 11000);
+            TcpClient server = new TcpClient("localhost", 1234);
 
             NetworkStream stream = server.GetStream();
             StreamWriter writer = new StreamWriter(stream);

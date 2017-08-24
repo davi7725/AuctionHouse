@@ -24,7 +24,7 @@ namespace Server
 
             for (int i = 0; i < 10; i++)
             {
-                auctions.Add(new ItemAuction(new Item("Item number " + i, i*100)));
+                auctions.Add(new ItemAuction(new Item("Item number " + (i + 1), (i+1)*100)));
             }
 
             while (true)

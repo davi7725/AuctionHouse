@@ -26,7 +26,6 @@ namespace Server
 
         public void PartecipateAuction(Client c)
         {
-            //TODO go back to selection
             AddClient(c);
             c.StreamWriter.WriteLine("Item on sale: " + Item.Name + "\tItem price: " + Item.GetPrice());
             bool repeat = true;

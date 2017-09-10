@@ -24,7 +24,7 @@ namespace Server
 
             for (int i = 0; i < 10; i++)
             {
-                auctions.Add(new ItemAuction(new Item("Item number " + (i + 1), (i+1)*100)));
+                auctions.Add(new ItemAuction(new Item("Item number " + (i + 1), (i + 1) * 100)));
             }
 
             while (true)
@@ -36,33 +36,41 @@ namespace Server
 
         private Client InitializeClient(Socket clientSocket)
         {
-            NetworkStream networkStream = new NetworkStream(clientSocket);
-            StreamWriter sw = new StreamWriter(networkStream);
-            sw.AutoFlush = true;
-            StreamReader sr = new StreamReader(networkStream);
-
-            string name = null;
-            sw.WriteLine("Choose a username!");
-            do
+            try
             {
-                if (name != null)
+                NetworkStream networkStream = new NetworkStream(clientSocket);
+                StreamWriter sw = new StreamWriter(networkStream);
+                sw.AutoFlush = true;
+                StreamReader sr = new StreamReader(networkStream);
+
+                string name = null;
+                sw.WriteLine("Choose a username!");
+                do
                 {
-                    sw.WriteLine("Name already taken!");
-                }
-                name = sr.ReadLine();
-            } while (names.Contains(name));
-            names.Add(name);
-            sw.WriteLine("Name ok.");
-            return new Client(clientSocket, sw, sr, name);
+                    if (name != null)
+                    {
+                        sw.WriteLine("Name already taken!");
+                    }
+                    name = sr.ReadLine();
+                } while (names.Contains(name));
+                names.Add(name);
+                sw.WriteLine("Name ok.");
+                return new Client(clientSocket, sw, sr, name);
+            }
+            catch (IOException)
+            {
+                return null;
+            }
         }
 
         private ItemAuction AuctionSelection(Client c)
         {
-            c.StreamWriter.WriteLine("Choose an item.");
+            c.Send("Choose an item.");
             foreach (ItemAuction itemAuction in auctions)
             {
-                if (!itemAuction.IsBidFinished()) { 
-                    c.StreamWriter.WriteLine("{0} - Name: {1} - Current price: {2}", itemAuction.ID, itemAuction.Item.Name, itemAuction.Item.GetPrice());
+                if (!itemAuction.IsBidFinished())
+                {
+                    c.Send(itemAuction.ID + " - Name: " + itemAuction.Item.Name + " - Current price: " + itemAuction.Item.GetPrice());
                 }
             }
 
@@ -72,7 +80,7 @@ namespace Server
             {
                 if (!firstTime)
                 {
-                    c.StreamWriter.WriteLine("Invalid input.");
+                    c.Send("Invalid input.");
                 }
                 else
                 {
@@ -81,7 +89,7 @@ namespace Server
 
                 try
                 {
-                    int id = int.Parse(c.StreamReader.ReadLine());
+                    int id = int.Parse(c.Receive());
                     ia = GetAuctionFromID(id);
                 }
                 catch (FormatException)
@@ -106,24 +114,28 @@ namespace Server
 
         private void ClientThread(Client client)
         {
-            ItemAuction chosenAuction = null;
-            try
+            if (client != null)
             {
-                while (true)
+                ItemAuction chosenAuction = null;
+                try
                 {
-                    chosenAuction = AuctionSelection(client);
-                    chosenAuction.PartecipateAuction(client);
+                    while (true)
+                    {
+                        chosenAuction = AuctionSelection(client);
+                        chosenAuction.PartecipateAuction(client);
+                    }
                 }
-            }
-            catch (IOException)
-            {
-                Console.WriteLine(client.Name + " disconnected");
-                if (chosenAuction != null)
+                catch (Exception ex)
                 {
-                    chosenAuction.RemoveClient(client);
+                    if (ex is ArgumentNullException || ex is IOException)
+                    Console.WriteLine(client.Name + " disconnected");
+                    if (chosenAuction != null)
+                    {
+                        chosenAuction.RemoveClient(client);
+                    }
+                    names.Remove(client.Name);
+                    client.Dispose();
                 }
-                names.Remove(client.Name);
-                client.Dispose();
             }
         }
 

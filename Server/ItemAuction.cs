@@ -8,6 +8,7 @@ namespace Server
 {
     class ItemAuction
     {
+        public delegate void Message(string value);
         static int currID = 0;
         public Item Item { get; private set; }
         private Gavel gavel;
@@ -15,7 +16,7 @@ namespace Server
         private List<Client> clients = new List<Client>();
         private object clientsLock = new object();
         private Mutex mutex = new Mutex();
-
+        private event Message broadcast;
         public ItemAuction(Item item)
         {
             ID = currID++;
@@ -27,12 +28,12 @@ namespace Server
         public void PartecipateAuction(Client c)
         {
             AddClient(c);
-            c.StreamWriter.WriteLine("Item on sale: " + Item.Name + "\tItem price: " + Item.GetPrice());
+            c.Send("Item on sale: " + Item.Name + "\tItem price: " + Item.GetPrice() + "\tStarting price was: " + Item.StartingPrice);
             bool repeat = true;
-            c.StreamWriter.WriteLine("Type quit to quit");
+            c.Send("Type quit to quit");
             while (repeat)
             {
-                string message = c.StreamReader.ReadLine();
+                string message = c.Receive();
                 if (message != "quit")
                 {
                     try
@@ -43,27 +44,26 @@ namespace Server
                         mutex.WaitOne();
                         if (Item.GetPrice() < biddingValue)
                         {
-                            if (gavel.Stop())
+                            if (gavel.Reset(c.Name, biddingValue))
                             {
                                 Item.UpdatePrice(biddingValue);
-                                c.StreamWriter.WriteLine("Bid ok");
-                                Utils.Broadcast("Highest bid now " + biddingValue, clients);
-                                gavel.Start(c.Name, biddingValue);
+                                c.Send("Bid ok");
+                                broadcast("Highest bid now " + biddingValue);
                             }
                             else
                             {
-                                c.StreamWriter.WriteLine("The auction is finished!");
+                                c.Send("The auction is finished!");
                             }
                         }
                         else
                         {
-                            if (gavel.IsFinished())
+                            if (gavel.IsFinished)
                             {
-                                c.StreamWriter.WriteLine("The auction is finished!");
+                                c.Send("The auction is finished!");
                             }
                             else
                             {
-                                c.StreamWriter.WriteLine("Your bid is too low!");
+                                c.Send("Your bid is too low!");
                             }
                         }
                         mutex.ReleaseMutex();
@@ -71,7 +71,7 @@ namespace Server
                     catch (Exception e)
                     {
                         Console.WriteLine(e.Message);
-                        c.StreamWriter.WriteLine("Incorrect bid format");
+                        c.Send("Incorrect bid format");
                     }
                 }
                 else
@@ -86,7 +86,8 @@ namespace Server
             lock (clientsLock)
             {
                 clients.Add(c);
-                gavel.AddClientStream(c.StreamWriter);
+                gavel.AddClient(c.Send);
+                broadcast += c.Send;
             }
         }
 
@@ -95,13 +96,14 @@ namespace Server
             lock (clientsLock)
             {
                 clients.Remove(c);
-                gavel.RemoveClientStream(c.StreamWriter);
+                gavel.RemoveClient(c.Send);
+                broadcast -= c.Send;
             }
         }
 
         public bool IsBidFinished()
         {
-            return gavel.IsFinished();
+            return gavel.IsFinished;
         }
     }
 }

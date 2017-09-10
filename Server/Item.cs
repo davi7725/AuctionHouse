@@ -9,7 +9,7 @@ namespace Server
     class Item
     {
         public string Name { get; private set; }
-
+        public int StartingPrice { get; private set; }
         private int price;
         private object lockPrice = new object();
 
@@ -17,6 +17,7 @@ namespace Server
         {
             this.Name = name;
             this.price = price;
+            StartingPrice = price;
         }
 
         public int GetPrice()
@@ -49,6 +50,11 @@ namespace Server
                 return this.Name == ((Item)obj).Name;
             }
             return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return this.Name == null ? 0 : this.Name.GetHashCode();
         }
     }
 }

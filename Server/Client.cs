@@ -11,23 +11,37 @@ namespace Server
     class Client
     {
         private Socket socket;
-        public StreamWriter StreamWriter { get; private set; }
-        public StreamReader StreamReader { get; private set; }
+        private StreamWriter sw;
+        private StreamReader sr;
+        private object myLock = new object();
         public string Name { get; private set; }
 
         public Client(Socket clientSocket, StreamWriter sw, StreamReader sr, string name)
-        { 
+        {
             socket = clientSocket;
-            StreamWriter = sw;
-            StreamReader = sr;
+            this.sw = sw;
+            this.sr = sr;
             this.Name = name;
         }
 
         public void Dispose()
         {
-            StreamWriter.Close();
-            StreamReader.Close();
+            sw.Close();
+            sr.Close();
             socket.Close();
-        } 
+        }
+
+        public void Send(string msg)
+        {
+            lock (myLock)
+            {
+                sw.WriteLine(msg);
+            }
+        }
+
+        public string Receive()
+        {
+            return sr.ReadLine();
+        }
     }
 }

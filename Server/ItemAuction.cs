@@ -48,7 +48,10 @@ namespace Server
                             {
                                 Item.UpdatePrice(biddingValue);
                                 c.Send("Bid ok");
-                                broadcast("Highest bid now " + biddingValue);
+                                lock (clientsLock)
+                                {
+                                    broadcast("Highest bid now " + biddingValue);
+                                }
                             }
                             else
                             {

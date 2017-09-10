@@ -13,7 +13,6 @@ namespace Server
     class Program
     {
         private List<StreamWriter> streams = new List<StreamWriter>();
-        private Mutex mutex = new Mutex();
         private List<ItemAuction> auctions = new List<ItemAuction>();
         private List<string> names = new List<string>();
 
